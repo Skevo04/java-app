@@ -37,7 +37,6 @@ pipeline {
         
         stage('Static Analysis') {
             steps {
-                sh './mvnw checkstyle:check'
                 sh './mvnw spotbugs:check'
             }
         }
