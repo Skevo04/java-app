@@ -6,6 +6,11 @@ pipeline {
         jdk 'JDK-17'
     }
     
+    environment {
+        DOCKER_IMAGE = 'petclinic'
+        DOCKER_TAG = "${BUILD_NUMBER}"
+    }
+    
     stages {
         stage('Checkout') {
             steps {
@@ -23,11 +28,33 @@ pipeline {
             steps {
                 sh './mvnw test'
             }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+        
+        stage('Static Analysis') {
+            steps {
+                sh './mvnw checkstyle:check'
+                sh './mvnw spotbugs:check'
+            }
         }
         
         stage('Package') {
             steps {
                 sh './mvnw package -DskipTests'
+                archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            }
+        }
+        
+        stage('Docker Build') {
+            steps {
+                script {
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                    docker.build("${DOCKER_IMAGE}:latest")
+                }
             }
         }
     }
