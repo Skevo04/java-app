@@ -48,13 +48,13 @@ pipeline {
             }
         }
         
-        // stage('Docker Build') {
-        //     steps {
-        //         script {
-        //             docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-        //             docker.build("${DOCKER_IMAGE}:latest")
-        //         }
-        //     }
-        // }
+        stage('Docker Build') {
+            steps {
+                script {
+                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                    docker.build("${DOCKER_IMAGE}:latest")
+                }
+            }
+        }
     }
 }
