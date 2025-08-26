@@ -22,7 +22,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=postgres
       - DB_HOST=postgres
-      - DB_PORT=5433
+      - DB_PORT=5432
       - DB_NAME=petclinic
       - DB_USER=petclinic
       - DB_PASSWORD=petclinic
