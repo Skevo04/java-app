@@ -57,12 +57,12 @@ pipeline {
             }
         }
         
-        // stage('Deploy Locally') {
-        //     steps {
-        //         sh 'docker-compose down || true'
-        //         sh 'docker-compose up -d'
-        //         echo 'Application deployed! Access at: http://localhost:8080'
-        //     }
-        // }
+        stage('Deploy Locally') {
+            steps {
+                sh 'docker-compose down || true'
+                sh 'docker-compose up -d'
+                echo 'Application deployed! Access at: http://localhost:8080'
+            }
+        }
     }
 }
