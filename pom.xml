@@ -13,7 +13,9 @@
   <artifactId>spring-petclinic</artifactId>
   <version>3.5.0-SNAPSHOT</version>
 
-  <name>petclinic</name>
+  <name>Spring PetClinic</name>
+  <description>Production-ready Spring Boot application demonstrating modern Java development practices with CI/CD</description>
+  <url>https://github.com/spring-projects/spring-petclinic</url>
 
   <properties>
 

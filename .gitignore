@@ -49,3 +49,26 @@ out/
 _site/
 *.css
 !petclinic.css
+
+### Docker ###
+.docker/
+
+### Logs ###
+*.log
+logs/
+
+### OS ###
+.DS_Store
+Thumbs.db
+
+### Environment ###
+.env
+.env.local
+.env.*.local
+
+### Jenkins ###
+.jenkins/
+
+### Coverage ###
+coverage/
+*.lcov
