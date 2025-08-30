@@ -1,20 +1,38 @@
-# Spring PetClinic - Production-Ready Java Application
+# Jenkins CI/CD Pipeline Implementation with Spring PetClinic
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.java.net/projects/jdk/17/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://jenkins.example.com/job/petclinic/)
 
-A production-style Spring Boot web application demonstrating modern Java development practices with automated CI/CD pipeline.
+**A complete Jenkins CI/CD pipeline implementation** using Spring PetClinic as the demonstration application. This project showcases automated build, test, quality analysis, and deployment workflows with Jenkins.
 
-## What This Application Does
+## Jenkins CI/CD Pipeline - Main Focus
 
-**PetClinic** is a veterinary clinic management system that allows:
+This repository demonstrates a **complete Jenkins pipeline implementation** with:
+
+### Automated Pipeline Stages
+1. **Build** - Maven compilation and dependency resolution
+2. **Test** - Unit tests with JUnit 5, integration tests with Testcontainers
+3. **Static Analysis** - Checkstyle code style, SpotBugs security/quality checks
+4. **Package** - JAR artifact creation with build metadata
+5. **Docker Build** - Container image creation
+6. **Deploy** - Local Docker Compose deployment
+
+### Quality Gates Enforced
+- ✅ All tests must pass (unit + integration)
+- ✅ Code coverage > 80% (JaCoCo)
+- ✅ Zero Checkstyle violations
+- ✅ No high/medium SpotBugs issues
+
+## Demo Application: PetClinic
+
+The pipeline uses **Spring PetClinic** as the demonstration application:
 - **Pet Owners**: Register pets, schedule visits, view medical history
 - **Veterinarians**: Manage patient records, track treatments, view schedules
 - **Clinic Staff**: Handle appointments, maintain pet and owner databases
 
-**Tech Stack**: Spring Boot 3.5, JPA/Hibernate, Thymeleaf, H2/MySQL/PostgreSQL, Docker, Jenkins
+**Tech Stack**: Spring Boot 3.5, JPA/Hibernate, Thymeleaf, H2/MySQL/PostgreSQL, Docker
 
 ## Architecture Overview
 
@@ -56,23 +74,13 @@ docker-compose up --build
 - **MySQL**: `./mvnw spring-boot:run -Dspring-boot.run.profiles=mysql`
 - **PostgreSQL**: `./mvnw spring-boot:run -Dspring-boot.run.profiles=postgres`
 
-## CI/CD Pipeline (Jenkins)
+## Pipeline Configuration
 
-The automated pipeline demonstrates production-ready practices:
-
-### Pipeline Stages
-1. **Build** - Maven compilation and dependency resolution
-2. **Test** - Unit tests with JUnit 5, integration tests with Testcontainers
-3. **Static Analysis** - Checkstyle code style, SpotBugs security/quality checks
-4. **Package** - JAR artifact creation with build metadata
-5. **Docker Build** - Container image creation
-6. **Deploy** - Local Docker Compose deployment
-
-### Quality Gates
-- ✅ All tests must pass (unit + integration)
-- ✅ Code coverage > 80% (JaCoCo)
-- ✅ Zero Checkstyle violations
-- ✅ No high/medium SpotBugs issues
+The Jenkins pipeline is defined in [Jenkinsfile](Jenkinsfile) and includes:
+- **Tools**: Maven 3.9, JDK 17
+- **Environment**: Docker image tagging with build numbers
+- **Post-actions**: JUnit test reporting, artifact archiving
+- **Deployment**: Automated Docker Compose deployment
 
 ## Environment Configuration
 
@@ -116,13 +124,13 @@ The automated pipeline demonstrates production-ready practices:
 ## Why This Matters
 
 This project demonstrates:
-- **Production-Ready Code**: Proper error handling, validation, caching, monitoring
-- **Modern Java Practices**: Spring Boot 3, JPA, Testcontainers, Docker
-- **DevOps Integration**: Automated CI/CD with quality gates and deployment
-- **Database Flexibility**: Multiple database support with profiles
-- **Professional Structure**: Clean architecture, comprehensive testing, documentation
+- **Jenkins CI/CD Mastery**: Complete pipeline implementation with quality gates
+- **DevOps Best Practices**: Automated testing, static analysis, and deployment
+- **Production-Ready Pipeline**: Real-world CI/CD workflow with Docker integration
+- **Quality Automation**: Enforced code standards and comprehensive testing
+- **Modern Toolchain**: Jenkins, Maven, Docker, Testcontainers, quality tools
 
-Perfect for showcasing full-stack Java development skills with modern tooling and practices.
+Perfect for showcasing **Jenkins CI/CD pipeline skills** with a real Java application.
 
 ## Contributing
 
