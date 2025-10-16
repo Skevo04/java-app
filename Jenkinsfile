@@ -12,5 +12,11 @@ pipeline {
                 checkout scm
             }
         }
+
+    stage('Build') {
+        steps {
+            sh './mvnw clean compile'
+            }
+        }
     }
 }
