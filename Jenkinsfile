@@ -13,7 +13,7 @@ pipeline {
             }
         }
 
-    stage('Frontend (Maven - css profile)') {
+    stage('Frontend build') {
             steps {
                 sh '''
                 set -e
@@ -36,7 +36,7 @@ pipeline {
             }
         }
 
-        stage('Backend (Maven)') {
+        stage('Backend build') {
             steps {
                 sh '''
                 set -e
