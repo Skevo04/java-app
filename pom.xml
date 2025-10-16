@@ -373,8 +373,9 @@
             <version>${libsass.version}</version>
             <configuration>
               <inputPath>${basedir}/src/main/scss/</inputPath>
-              <outputPath>${basedir}/src/main/resources/static/resources/css/</outputPath>
-              <includePath>${project.build.directory}/webjars/META-INF/resources/webjars/bootstrap/${webjars-bootstrap.version}/scss/</includePath>
++              <!-- write compiled CSS into the build output so it ends up under target/classes/static -->
++              <outputPath>${project.build.outputDirectory}/static/resources/css/</outputPath>
++              <includePath>${project.build.directory}/webjars/META-INF/resources/webjars/bootstrap/${webjars-bootstrap.version}/scss/</includePath>
             </configuration>
             <executions>
               <execution>
