@@ -36,10 +36,14 @@ pipeline {
             }
         }
 
-        stage('Backend Build') {
-            agent { docker { image 'maven:3.9.0-eclipse-temurin-17' } }
+        stage('Backend (Maven)') {
             steps {
-                sh './mvnw -B -DskipTests clean package'
+                sh '''
+                set -e
+                chmod +x ./mvnw || true
+                # build backend artifact; do NOT activate -Pcss so frontend plugin won't run again
+                ./mvnw -B -DskipTests clean package
+                '''
             }
             post {
                 success {
