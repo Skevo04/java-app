@@ -6,8 +6,8 @@ pipeline {
         DOCKER_TAG = "${BUILD_NUMBER}"
         WORKSPACE_PATH = "${env.WORKSPACE}" // Jenkins workspace path
 
-        DOCKER_REGISTRY = 'github.com'
-        GITHUB_USERNAME = 'Skevo04'  // Replace with your GitHub username
+        DOCKER_REGISTRY = 'ghcr.io'
+        GITHUB_USERNAME = 'skevo04'  // Replace with your GitHub username
         GITHUB_REPO = 'java-app'                   // Replace with your repository name
         GHCR_CREDENTIALS_ID = 'github_token'    // ← This MUST match your credential ID exactly
     }
