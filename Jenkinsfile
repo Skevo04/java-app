@@ -8,7 +8,7 @@ pipeline {
 
         DOCKER_REGISTRY = 'ghcr.io'
         GITHUB_USERNAME = 'Skevo04'  // Replace with your GitHub username
-        GITHUB_REPO = 'java-app'                   // Replace with your repository name
+        GITHUB_REPO = 'Skevo04/java-app'                   // Replace with your repository name
         GHCR_CREDENTIALS_ID = 'github_token'    // ← This MUST match your credential ID exactly
     }
     
