@@ -112,7 +112,7 @@ stage('Push to GitHub Packages') {
     steps {
         script {
             echo "Deploying to Production Blue environment"
-            echo ${GHCR_CREDENTIALS_ID}
+            echo '${GHCR_CREDENTIALS_ID}'
             sshagent([SSH_CREDENTIALS_ID]) {
                 sh """
                          
