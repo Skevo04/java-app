@@ -112,14 +112,9 @@ stage('Push to GitHub Packages') {
     steps {
         script {
             echo "Deploying to Production Blue environment"
+            echo ${GHCR_TOKEN}
             sshagent([SSH_CREDENTIALS_ID]) {
                 sh """
-                    export GHCR_TOKEN='${GHCR_TOKEN}'
-                    ssh -o SendEnv=GHCR_TOKEN -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
-                    
-                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
-                        # Login to GitHub Container Registry
-                        echo \"\$GHCR_TOKEN\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
                          
                         # Pull latest images
                         docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
