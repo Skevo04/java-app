@@ -105,13 +105,11 @@ stage('Push to GitHub Packages') {
         }
 
       stage('Deploy Prod Blue') {
-    environment {
-        BLUE_SSH_CREDENTIALS_ID = credentials("${SSH_CREDENTIALS_ID}")
-    }
+    
     steps {
         script {
             echo "Deploying to Production Blue environment"
-            sshagent([BLUE_SSH_CREDENTIALS_ID]) {
+            sshagent([SSH_CREDENTIALS_ID]) {
                 sh """
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
                         # Login to GitHub Container Registry
@@ -148,13 +146,11 @@ stage('Push to GitHub Packages') {
 }
 
 stage('Deploy Prod Green') {
-    environment {
-        GREEN_SSH_CREDENTIALS_ID = credentials("${SSH_CREDENTIALS_ID}")
-    }
+
     steps {
         script {
             echo "Deploying to Production Green environment"
-            sshagent([GREEN_SSH_CREDENTIALS_ID]) {
+            sshagent([SSH_CREDENTIALS_ID]) {
                 sh """
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} '
                         # Login to GitHub Container Registry
