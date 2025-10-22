@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent 'jenkins'
     
     environment {
         DOCKER_IMAGE = 'petclinic'
