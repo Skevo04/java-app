@@ -113,7 +113,7 @@ stage('Push to GitHub Packages') {
                 sh """
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
                         # Login to GitHub Container Registry
-                        echo \"${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                        echo \"${GHCR_CREDENTIALS_ID}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
                         
                         # Pull latest images
                         docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
@@ -154,7 +154,7 @@ stage('Deploy Prod Green') {
                 sh """
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} '
                         # Login to GitHub Container Registry
-                        echo \"${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                        echo \"${GHCR_CREDENTIALS_ID}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
                         
                         # Pull latest images
                         docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
