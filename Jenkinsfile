@@ -10,6 +10,13 @@ pipeline {
         GITHUB_USERNAME = 'skevo04'  // Replace with your GitHub username
         GITHUB_REPO = 'java-app'                   // Replace with your repository name
         GHCR_CREDENTIALS_ID = 'github_token'    // ← This MUST match your credential ID exactly
+
+        BLUE_SERVER_IP = '192.168.64.7'
+        GREEN_SERVER_IP = '192.168.64.6'
+        SERVER_USER = 'ubuntu'
+        SSH_CREDENTIALS_ID = 'jenkins-slave'
+        
+        
     }
     
     stages {
@@ -97,8 +104,90 @@ stage('Push to GitHub Packages') {
             }
         }
 
-       
+      stage('Deploy Prod Blue') {
+    environment {
+        BLUE_SSH_CREDENTIALS = credentials("${BLUE_SSH_CREDENTIALS_ID}")
+    }
+    steps {
+        script {
+            echo "Deploying to Production Blue environment"
+            sshagent([BLUE_SSH_CREDENTIALS_ID]) {
+                sh """
+                    ssh -o StrictHostKeyChecking=no ${BLUE_SERVER_USER}@${BLUE_SERVER_IP} '
+                        # Login to GitHub Container Registry
+                        echo \"${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                        
+                        # Pull latest images
+                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
+                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                        
+                        # Stop and remove existing containers
+                        docker-compose down || true
+                        
+                        # Start new deployment
+                        docker-compose up -d
+                        
+                        # Health check
+                        sleep 30
+                        docker ps
+                        curl -f http://localhost:8080/health || exit 1
+                    '
+                """
+            }
+        }
+    }
+    post {
+        success {
+            echo "Production Blue deployment completed successfully"
+        }
+        failure {
+            echo "Production Blue deployment failed"
+            // Add rollback logic if needed
+        }
+    }
+}
 
+stage('Deploy Prod Green') {
+    environment {
+        GREEN_SSH_CREDENTIALS = credentials("${GREEN_SSH_CREDENTIALS_ID}")
+    }
+    steps {
+        script {
+            echo "Deploying to Production Green environment"
+            sshagent([GREEN_SSH_CREDENTIALS_ID]) {
+                sh """
+                    ssh -o StrictHostKeyChecking=no ${GREEN_SERVER_USER}@${GREEN_SERVER_IP} '
+                        # Login to GitHub Container Registry
+                        echo \"${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                        
+                        # Pull latest images
+                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
+                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                        
+                        # Stop and remove existing containers
+                        docker-compose down || true
+                        
+                        # Start new deployment
+                        docker-compose up -d
+                        
+                        # Health check
+                        sleep 30
+                        docker ps
+                        curl -f http://localhost:8080/health || exit 1
+                    '
+                """
+            }
+        }
+    }
+    post {
+        success {
+            echo "Production Green deployment completed successfully"
+        }
+        failure {
+            echo "Production Green deployment failed"
+        }
+    }
+}
     }
     
     
