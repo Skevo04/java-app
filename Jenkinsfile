@@ -116,7 +116,6 @@ stage('Push to GitHub Packages') {
                         echo \"${GHCR_CREDENTIALS_ID}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
                         
                         # Pull latest images
-                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
                         docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
                         
                         # Stop and remove existing containers
@@ -154,7 +153,6 @@ stage('Deploy Prod Green') {
                         echo \"${GHCR_CREDENTIALS_ID}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
                         
                         # Pull latest images
-                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
                         docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
                         
                         # Stop and remove existing containers
