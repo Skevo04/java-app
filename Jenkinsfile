@@ -14,7 +14,7 @@ pipeline {
         BLUE_SERVER_IP = '192.168.64.7'
         GREEN_SERVER_IP = '192.168.64.6'
         SERVER_USER = 'ubuntu'
-        SSH_CREDENTIALS_ID = 'jenkins-slave'
+        SSH_CREDENTIALS_ID = 'prod_deploy'
         
         
     }
