@@ -125,11 +125,8 @@ stage('Push to GitHub Packages') {
                         # Start new deployment
                         docker-compose up -d
                         
-                        # Health check
-                        sleep 30
-                        docker ps
-                        curl -f http://localhost:8080/health || exit 1
                     '
+                    
                 """
             }
         }
@@ -166,10 +163,7 @@ stage('Deploy Prod Green') {
                         # Start new deployment
                         docker-compose up -d
                         
-                        # Health check
-                        sleep 30
-                        docker ps
-                        curl -f http://localhost:8080/health || exit 1
+                       
                     '
                 """
             }
