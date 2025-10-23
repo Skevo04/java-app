@@ -230,8 +230,11 @@ stage('Deploy Load Balancer') {
                     sshagent([SSH_CREDENTIALS_ID_LOADBALANCER]) {
                         sh """
                             # Copy configuration files to load balancer server
-                            scp -o StrictHostKeyChecking=no nginx-loadbalancer.conf ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
-                            scp -o StrictHostKeyChecking=no docker-compose-loadbalancer.yml ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
+                            # Copy nginx config from its location on Jenkins agent
+                    scp -o StrictHostKeyChecking=no /home/jenkins/nginx-loadbalancer.conf ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
+                    
+                    # Copy docker-compose from workspace (Git location)
+                    scp -o StrictHostKeyChecking=no /home/jenkins/workspace/final-project-build_main/docker-compose-loadbalancer.yml ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
                             
                             # Deploy load balancer
                             ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${LOADBALANCER_SERVER} '
