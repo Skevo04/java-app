@@ -6,5 +6,4 @@ services:
       - "80:80"
     volumes:
       - ./nginx-loadbalancer.conf:/etc/nginx/conf.d/default.conf
-      - ./status-page.html:/usr/share/nginx/html/status-page.html
     restart: unless-stopped
