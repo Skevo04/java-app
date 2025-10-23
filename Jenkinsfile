@@ -105,29 +105,42 @@ stage('Push to GitHub Packages') {
         }
 
       stage('Deploy Prod Blue') {
-        environment {
-                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")  // This references the credential
-            }
-    
+    environment {
+        GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
+    }
     steps {
         script {
             echo "Deploying to Production Blue environment"
-            echo "${GHCR_CREDENTIALS_ID}"
-            echo "GitHub Token: ${GHCR_TOKEN}" 
+            
+            // 1. Login and pull image on Jenkins agent
+            sh """
+                echo \"\${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+            """
+            
+            // 2. Transfer and deploy directly
             sshagent([SSH_CREDENTIALS_ID]) {
                 sh """
-                         
-                        # Pull latest images
-                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                        
+                    # Deploy on production server
+                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
                         # Stop and remove existing containers
                         docker-compose down || true
-                        
+                    '
+                    
+                    # Transfer the Docker image directly
+                    docker save ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest | \
+                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} docker load
+                    
+                    # Start the deployment
+                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
                         # Start new deployment
                         docker-compose up -d
                         
+                        # Health check
+                        sleep 30
+                        docker ps
+                        curl -f http://localhost:8080/health || exit 1
                     '
-                    
                 """
             }
         }
@@ -138,35 +151,46 @@ stage('Push to GitHub Packages') {
         }
         failure {
             echo "Production Blue deployment failed"
-            // Add rollback logic if needed
         }
     }
 }
 
 stage('Deploy Prod Green') {
     environment {
-                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")  // This references the credential
-            }
-
+        GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
+    }
     steps {
         script {
             echo "Deploying to Production Green environment"
+            
+            // 1. Login and pull image on Jenkins agent
+            sh """
+                echo \"\${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+            """
+            
+            // 2. Transfer and deploy directly
             sshagent([SSH_CREDENTIALS_ID]) {
                 sh """
+                    # Deploy on production server
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} '
-                        # Login to GitHub Container Registry
-                        echo \"\$GHCR_TOKEN\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
-                        
-                        # Pull latest images
-                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                        
                         # Stop and remove existing containers
                         docker-compose down || true
-                        
+                    '
+                    
+                    # Transfer the Docker image directly
+                    docker save ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest | \
+                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} docker load
+                    
+                    # Start the deployment
+                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} '
                         # Start new deployment
                         docker-compose up -d
                         
-                       
+                        # Health check
+                        sleep 30
+                        docker ps
+                        curl -f http://localhost:8080/health || exit 1
                     '
                 """
             }
