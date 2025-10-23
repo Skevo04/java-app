@@ -123,8 +123,9 @@ stage('Push to GitHub Packages') {
                 sh """
                     # Deploy on production server
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
-                        # Stop and remove existing containers
-                        docker-compose down || true
+                        # Stop and remove existing container if running
+                        docker stop petclinic || true
+                        docker rm petclinic || true
                     '
                     
                     # Transfer the Docker image directly
@@ -133,9 +134,19 @@ stage('Push to GitHub Packages') {
                     
                     # Start the deployment
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
-                        # Start new deployment
-                        docker-compose up -d
+                        # Start new container
+                        docker run -d \
+                            --name petclinic \
+                            -p 8080:8080 \
+                            ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
                         
+                        # Health check
+                        sleep 30
+                        echo "Container status:"
+                        docker ps
+                        echo "Health check:"
+                        curl -f http://localhost:8080 || curl -f http://localhost:8080/actuator/health || exit 1
+                        echo "✅ Blue deployment successful!"
                     '
                 """
             }
@@ -170,8 +181,9 @@ stage('Deploy Prod Green') {
                 sh """
                     # Deploy on production server
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} '
-                        # Stop and remove existing containers
-                        docker-compose down || true
+                        # Stop and remove existing container if running
+                        docker stop petclinic || true
+                        docker rm petclinic || true
                     '
                     
                     # Transfer the Docker image directly
@@ -180,9 +192,19 @@ stage('Deploy Prod Green') {
                     
                     # Start the deployment
                     ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} '
-                        # Start new deployment
-                        docker-compose up -d
+                        # Start new container
+                        docker run -d \
+                            --name petclinic \
+                            -p 8080:8080 \
+                            ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
                         
+                        # Health check
+                        sleep 30
+                        echo "Container status:"
+                        docker ps
+                        echo "Health check:"
+                        curl -f http://localhost:8080 || curl -f http://localhost:8080/actuator/health || exit 1
+                        echo "✅ Green deployment successful!"
                     '
                 """
             }
