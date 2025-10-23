@@ -13,8 +13,10 @@ pipeline {
 
         BLUE_SERVER_IP = '192.168.64.7'
         GREEN_SERVER_IP = '192.168.64.6'
+        LOADBALANCER_SERVER = '192.168.64.8'
         SERVER_USER = 'ubuntu'
         SSH_CREDENTIALS_ID = 'prod_deploy'
+        SSH_CREDENTIALS_ID_LOADBALANCER = 'jenkins_loadbalancer'
         
         
     }
@@ -219,6 +221,45 @@ stage('Deploy Prod Green') {
         }
     }
 }
+
+stage('Deploy Load Balancer') {
+            steps {
+                script {
+                    echo "Deploying Nginx Load Balancer"
+                    
+                    sshagent([SSH_CREDENTIALS_ID_LOADBALANCER]) {
+                        sh """
+                            # Copy configuration files to load balancer server
+                            scp -o StrictHostKeyChecking=no nginx-loadbalancer.conf ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
+                            scp -o StrictHostKeyChecking=no docker-compose-loadbalancer.yml ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
+                            
+                            # Deploy load balancer
+                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${LOADBALANCER_SERVER} '
+                                cd /home/ubuntu
+                                echo "Stopping existing load balancer..."
+                                docker-compose -f docker-compose-loadbalancer.yml down || true
+                                
+                                echo "Starting new load balancer..."
+                                docker-compose -f docker-compose-loadbalancer.yml up -d
+                                
+                                echo "Load balancer deployed successfully!"
+                                echo "🎯 Users should now access: http://${LOADBALANCER_SERVER}"
+                                echo "📊 Status page: http://${LOADBALANCER_SERVER}/status"
+                            '
+                        """
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "Load balancer deployed successfully!"
+                    echo "Single access point: http://${LOADBALANCER_SERVER}"
+                }
+                failure {
+                    echo "Load balancer deployment failed"
+                }
+            }
+        }
     }
     
     
