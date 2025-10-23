@@ -232,7 +232,7 @@ stage('Deploy Load Balancer') {
                             # Copy configuration files to load balancer server
                             # Copy nginx config from its location on Jenkins agent
                     scp -o StrictHostKeyChecking=no /home/jenkins/nginx-loadbalancer.conf ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
-                    
+                    scp -o StrictHostKeyChecking=no /home/jenkins/status-page.html ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
                     # Copy docker-compose from workspace (Git location)
                     scp -o StrictHostKeyChecking=no /home/jenkins/workspace/final-project-build_main/docker-compose-loadbalancer.yml ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
                             
