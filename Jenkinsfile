@@ -11,7 +11,7 @@ pipeline {
         GITHUB_REPO = 'java-app'                   // Replace with your repository name
         GHCR_CREDENTIALS_ID = 'github_token'    // ← This MUST match your credential ID exactly
 
-        BLUE_SERVER_IP = '192.168.64.7'
+        BLUE_SERVER_IP = '192.168.64.9'
         GREEN_SERVER_IP = '192.168.64.6'
         LOADBALANCER_SERVER = '192.168.64.8'
         SERVER_USER = 'ubuntu'
