@@ -78,7 +78,7 @@ pipeline {
         }
 
         // STAGE 2: Deploy to Prod (Blue)
-        stage('Deploy to Prod') {
+        stage('Deploy to Prod Blue') {
             environment {
                 GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
             }
@@ -213,88 +213,66 @@ pipeline {
         
         // STAGE 5: Conditional Rollback
         stage('Rollback') {
-            when {
-                expression { env.HEALTH_CHECK_FAILED == 'true' }
-            }
-            environment {
-                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
-            }
-            steps {
-                script {
-                    echo "🚨 HEALTH CHECK FAILED - Initiating rollback to previous version"
-                    
-                    sshagent([SSH_CREDENTIALS_ID]) {
-                        sh """
-                            # Rollback on Blue server
-                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
-                                echo "Stopping current deployment..."
-                                docker stop petclinic || true
-                                docker rm petclinic || true
-                                
-                                echo "Attempting to rollback to previous version: ${PREVIOUS_DOCKER_TAG}"
-                                # Try to use the previous tag, if not available use latest as fallback
-                                if docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${PREVIOUS_DOCKER_TAG}; then
-                                    echo "Rolling back to tag: ${PREVIOUS_DOCKER_TAG}"
-                                    docker run -d \\
-                                        --name petclinic \\
-                                        -p 8080:8080 \\
-                                        ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${PREVIOUS_DOCKER_TAG}
-                                    echo "✅ Rollback to previous version completed!"
-                                else
-                                    echo "Previous tag not found, falling back to latest"
-                                    docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                                    docker run -d \\
-                                        --name petclinic \\
-                                        -p 8080:8080 \\
-                                        ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                                    echo "✅ Rollback to latest version completed!"
-                                fi
-                                
-                                sleep 30
-                                echo "Rollback container status:"
-                                docker ps
-                                echo "Verifying rollback health check..."
-                                curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8080 || echo "⚠️ Rollback health check also failed"
-                            '
-                        """
-                    }
-                }
-            }
-            post {
-                success {
-                    echo "🔄 Rollback procedure completed successfully"
-                    // Send rollback notification
-                    // emailext body: "Rollback was triggered for build ${BUILD_NUMBER} due to health check failure", subject: "Rollback Alert", to: "team@example.com"
-                }
-                failure {
-                    echo "❌ Rollback procedure failed"
-                }
+    when {
+        expression { env.HEALTH_CHECK_FAILED == 'true' }
+    }
+    environment {
+        GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
+    }
+    steps {
+        script {
+            echo "🚨 HEALTH CHECK FAILED - Initiating rollback to previous version"
+            
+            sshagent([SSH_CREDENTIALS_ID]) {
+                sh """
+                    # Rollback on Blue server
+                    ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
+                        echo "Stopping current deployment..."
+                        docker stop petclinic || true
+                        docker rm petclinic || true
+                        
+                        echo "Logging into GitHub Container Registry..."
+                        echo \"${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                        
+                        echo "Attempting to rollback to previous version: ${PREVIOUS_DOCKER_TAG}"
+                        # Try to use the previous tag, if not available use latest as fallback
+                        if docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${PREVIOUS_DOCKER_TAG}; then
+                            echo "Rolling back to tag: ${PREVIOUS_DOCKER_TAG}"
+                            docker run -d \\
+                                --name petclinic \\
+                                -p 8080:8080 \\
+                                ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${PREVIOUS_DOCKER_TAG}
+                            echo "✅ Rollback to previous version completed!"
+                        else
+                            echo "Previous tag not found, falling back to latest"
+                            docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                            docker run -d \\
+                                --name petclinic \\
+                                -p 8080:8080 \\
+                                ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                            echo "✅ Rollback to latest version completed!"
+                        fi
+                        
+                        sleep 30
+                        echo "Rollback container status:"
+                        docker ps
+                        echo "Verifying rollback health check..."
+                        curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8080 || echo "⚠️ Rollback health check also failed"
+                    '
+                """
             }
         }
     }
-    
     post {
-        always {
-            echo "Pipeline execution completed - Build ${currentBuild.result}"
-            // Cleanup tasks can go here
-        }
         success {
-            echo "✅ Pipeline executed successfully!"
-            script {
-                if (env.HEALTH_CHECK_FAILED == 'true') {
-                    echo "⚠️ Pipeline succeeded with rollback (health check failed but rollback was successful)"
-                } else {
-                    echo "🎉 Pipeline succeeded - new deployment is healthy!"
-                }
-            }
-        }
-        unstable {
-            echo "⚠️ Pipeline marked as unstable - health check failed"
-            // emailext body: "Build ${BUILD_NUMBER} failed health check and was rolled back", subject: "Health Check Failure & Rollback", to: "team@example.com"
+            echo "🔄 Rollback procedure completed successfully"
+            // Send rollback notification
+            // emailext body: "Rollback was triggered for build ${BUILD_NUMBER} due to health check failure", subject: "Rollback Alert", to: "team@example.com"
         }
         failure {
-            echo "❌ Pipeline failed!"
-            // emailext body: "Build ${BUILD_NUMBER} failed during deployment", subject: "Deployment Failure", to: "team@example.com"
+            echo "❌ Rollback procedure failed"
         }
+    }
+}
     }
 }
