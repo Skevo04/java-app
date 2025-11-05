@@ -77,14 +77,40 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy Staging') {
+        stage('Push to GitHub Packages') {
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+            }
             environment {
                 GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
             }
             steps {
                 script {
-                    echo "Deploying to Staging enviroment"
+                    echo "Health check passed - pushing image to registry"
+                    
+                    // Login to GitHub Container Registry
+                    sh """
+                        echo \"\$GHCR_TOKEN\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                    """
+                    
+                    // Tag and push images
+                    sh """
+                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
+                        docker tag ${DOCKER_IMAGE}:latest ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                        docker push ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
+                        docker push ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                    """
+                }
+            }
+        }
+
+        stage('Pull docker image and deploy') {
+            environment {
+                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
+            }
+            steps {
+                script {
+                    echo "Pulling docker image and deploying to staging server"
                     
                     // 1. Login and pull image on Jenkins agent
                     sh """
@@ -123,7 +149,7 @@ pipeline {
             }
             post {
                 success {
-                    echo "Staging deployment completed successfully"
+                    echo "Pulled docker image and staging deployment completed successfully"
                 }
                 failure {
                     echo "Staging deployment failed"
@@ -171,32 +197,7 @@ pipeline {
             }
         }
 
-        stage('Push to GitHub Packages') {
-            when {
-                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-            }
-            environment {
-                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
-            }
-            steps {
-                script {
-                    echo "Health check passed - pushing image to registry"
-                    
-                    // Login to GitHub Container Registry
-                    sh """
-                        echo \"\$GHCR_TOKEN\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
-                    """
-                    
-                    // Tag and push images
-                    sh """
-                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
-                        docker tag ${DOCKER_IMAGE}:latest ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                        docker push ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
-                        docker push ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                    """
-                }
-            }
-        }
+        
 
     }
 }
