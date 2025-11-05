@@ -16,6 +16,7 @@ pipeline {
         BLUE_SERVER_IP = '192.168.64.9'
         GREEN_SERVER_IP = '192.168.64.6'
         LOADBALANCER_SERVER = '192.168.64.8'
+        STAGING_SERVER_IP = '192.168.64.10'
         SERVER_USER = 'ubuntu'
         SSH_CREDENTIALS_ID = 'prod_deploy'
         SSH_CREDENTIALS_ID_LOADBALANCER = 'jenkins_loadbalancer'
@@ -77,10 +78,56 @@ pipeline {
             }
         }
 
-        stage('Deploy Locally') {
+        stage('Deploy Staging') {
+            environment {
+                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
+            }
             steps {
-                sh 'docker-compose down || true'
-                sh 'docker-compose up -d'
+                script {
+                    echo "Deploying to Staging enviroment"
+                    
+                    // 1. Login and pull image on Jenkins agent
+                    sh """
+                        echo \"\${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
+                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                    """
+                    
+                    // 2. Transfer and deploy directly
+                    sshagent([SSH_CREDENTIALS_ID]) {
+                        sh """
+                            # Deploy on staging server
+                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${STAGING_SERVER_IP} '
+                                docker stop petclinic || true
+                                docker rm petclinic || true
+                            '
+                            
+                            docker save ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest | \
+                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${STAGING_SERVER_IP} docker load
+                            
+                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${STAGING_SERVER_IP} '
+                                docker run -d \
+                                    --name petclinic \
+                                    -p 8080:8080 \
+                                    ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                                
+                                sleep 30
+                                echo "Container status:"
+                                docker ps
+                                echo "Health check:"
+                                curl -f http://localhost:8080 || curl -f http://localhost:8080/actuator/health || exit 1
+                                echo "✅ Staging deployment and health check successful!"
+                            '
+                        """
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "Staging deployment completed successfully"
+                }
+                failure {
+                    echo "Staging deployment failed"
+                }
             }
         }
 
