@@ -21,47 +21,49 @@ pipeline {
         // Health check configuration
         HEALTH_CHECK_MAX_RETRIES = '10'
         HEALTH_CHECK_RETRY_DELAY = '10' // seconds
+        
+        // Rollback configuration
+        PREVIOUS_DOCKER_TAG = "${env.BUILD_NUMBER.toInteger() - 1}"
     }
     
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Frontend build') {
-            steps {
-                sh '''
-                set -e
-                chmod +x ./mvnw || true
-                ./mvnw -B -Pcss -DskipTests generate-resources
-                mkdir -p frontend-dist
-                if [ -d target/classes/static ]; then
-                  cp -R target/classes/static/* frontend-dist/ || true
-                elif [ -d src/main/resources/static ]; then
-                  cp -R src/main/resources/static/* frontend-dist/ || true
-                fi
-                '''
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'frontend-dist/**', allowEmptyArchive: true
+        // STAGE 1: Build
+        stage('Build') {
+            parallel {
+                stage('Frontend build') {
+                    steps {
+                        sh '''
+                        set -e
+                        chmod +x ./mvnw || true
+                        ./mvnw -B -Pcss -DskipTests generate-resources
+                        mkdir -p frontend-dist
+                        if [ -d target/classes/static ]; then
+                          cp -R target/classes/static/* frontend-dist/ || true
+                        elif [ -d src/main/resources/static ]; then
+                          cp -R src/main/resources/static/* frontend-dist/ || true
+                        fi
+                        '''
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: 'frontend-dist/**', allowEmptyArchive: true
+                        }
+                    }
                 }
-            }
-        }
 
-        stage('Backend build') {
-            steps {
-                sh '''
-                set -e
-                chmod +x ./mvnw || true
-                ./mvnw -B -DskipTests clean package
-                '''
-            }
-            post {
-                success {
-                    archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                stage('Backend build') {
+                    steps {
+                        sh '''
+                        set -e
+                        chmod +x ./mvnw || true
+                        ./mvnw -B -DskipTests clean package
+                        '''
+                    }
+                    post {
+                        success {
+                            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                        }
+                    }
                 }
             }
         }
@@ -75,82 +77,8 @@ pipeline {
             }
         }
 
-        stage('Deploy Locally') {
-            steps {
-                sh 'docker-compose down || true'
-                sh 'docker-compose up -d'
-            }
-        }
-
-        stage('Health Check') {
-            steps {
-                script {
-                    echo "Performing health check on local deployment..."
-                    
-                    def healthCheckPassed = false
-                    def retries = env.HEALTH_CHECK_MAX_RETRIES.toInteger()
-                    
-                    for (int i = 1; i <= retries; i++) {
-                        try {
-                            echo "Health check attempt ${i}/${retries}"
-                            
-                            // Test the application health
-                            sh """
-                                curl -f http://localhost:8080/actuator/health || \
-                                curl -f http://localhost:8080 || \
-                                exit 1
-                            """
-                            
-                            echo "✅ Health check passed!"
-                            healthCheckPassed = true
-                            break
-                            
-                        } catch (Exception e) {
-                            echo "⚠️ Health check attempt ${i} failed, waiting ${env.HEALTH_CHECK_RETRY_DELAY} seconds..."
-                            if (i < retries) {
-                                sleep env.HEALTH_CHECK_RETRY_DELAY.toInteger()
-                            }
-                        }
-                    }
-                    
-                    if (!healthCheckPassed) {
-                        echo "❌ All health check attempts failed. Application is not healthy."
-                        currentBuild.result = 'FAILURE'
-                        error("Health check failed after ${retries} attempts")
-                    }
-                }
-            }
-        }
-
-        stage('Push to GitHub Packages') {
-            when {
-                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-            }
-            environment {
-                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
-            }
-            steps {
-                script {
-                    echo "Health check passed - pushing image to registry"
-                    
-                    // Login to GitHub Container Registry
-                    sh """
-                        echo \"\$GHCR_TOKEN\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
-                    """
-                    
-                    // Tag and push images
-                    sh """
-                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
-                        docker tag ${DOCKER_IMAGE}:latest ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                        docker push ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${DOCKER_TAG}
-                        docker push ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                    """
-                }
-            }
-        }
-
-        // ... rest of your stages (Deploy Prod Blue, Green, Load Balancer) remain the same
-        stage('Deploy Prod Blue') {
+        // STAGE 2: Deploy to Prod (Blue)
+        stage('Deploy to Prod') {
             environment {
                 GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
             }
@@ -185,8 +113,6 @@ pipeline {
                                 sleep 30
                                 echo "Container status:"
                                 docker ps
-                                echo "Health check:"
-                                curl -f http://localhost:8080 || curl -f http://localhost:8080/actuator/health || exit 1
                                 echo "✅ Blue deployment successful!"
                             '
                         """
@@ -202,68 +128,16 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy Prod Green') {
-            environment {
-                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
-            }
+        
+        // STAGE 3: Redirect Traffic to Blue
+        stage('Redirect Traffic to Blue') {
             steps {
                 script {
-                    echo "Deploying to Production Green environment"
-                    
-                    // 1. Login and pull image on Jenkins agent
-                    sh """
-                        echo \"\${GHCR_TOKEN}\" | docker login ${DOCKER_REGISTRY} -u ${GITHUB_USERNAME} --password-stdin
-                        docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                    """
-                    
-                    // 2. Transfer and deploy directly
-                    sshagent([SSH_CREDENTIALS_ID]) {
-                        sh """
-                            # Deploy on production server
-                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} '
-                                docker stop petclinic || true
-                                docker rm petclinic || true
-                            '
-                            
-                            docker save ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest | \
-                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} docker load
-                            
-                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${GREEN_SERVER_IP} '
-                                docker run -d \
-                                    --name petclinic \
-                                    -p 8080:8080 \
-                                    ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
-                                
-                                sleep 30
-                                echo "Container status:"
-                                docker ps
-                                echo "Health check:"
-                                curl -f http://localhost:8080 || curl -f http://localhost:8080/actuator/health || exit 1
-                                echo "✅ Green deployment successful!"
-                            '
-                        """
-                    }
-                }
-            }
-            post {
-                success {
-                    echo "Production Green deployment completed successfully"
-                }
-                failure {
-                    echo "Production Green deployment failed"
-                }
-            }
-        }
-
-        stage('Deploy Load Balancer') {
-            steps {
-                script {
-                    echo "Deploying Nginx Load Balancer"
+                    echo "Deploying Nginx Load Balancer - Redirecting traffic to Blue"
                     
                     sshagent([SSH_CREDENTIALS_ID_LOADBALANCER]) {
                         sh """
-                            scp -o StrictHostKeyChecking=no /home/jenkins/nginx-loadbalancer.conf ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
+                            scp -o StrictHostKeyChecking=no /home/jenkins/nginx-loadbalancer-redirectblue.conf ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
                             scp -o StrictHostKeyChecking=no /home/jenkins/status-page.html ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
                             scp -o StrictHostKeyChecking=no /home/jenkins/workspace/final-project-build_main/docker-compose-loadbalancer.yml ${SERVER_USER}@${LOADBALANCER_SERVER}:/home/ubuntu/
                             
@@ -281,7 +155,7 @@ pipeline {
             }
             post {
                 success {
-                    echo "Load balancer deployed successfully!"
+                    echo "Load balancer deployed successfully! Traffic redirected to Blue."
                     echo "Single access point: http://${LOADBALANCER_SERVER}"
                 }
                 failure {
@@ -289,12 +163,136 @@ pipeline {
                 }
             }
         }
+        
+        // STAGE 4: Health Check
+        stage('Health Check') {
+            steps {
+                script {
+                    echo "Performing health check on Blue deployment..."
+                    
+                    def healthCheckPassed = false
+                    def retries = env.HEALTH_CHECK_MAX_RETRIES.toInteger()
+                    
+                    for (int i = 1; i <= retries; i++) {
+                        try {
+                            echo "Health check attempt ${i}/${retries} on Blue server: ${BLUE_SERVER_IP}"
+                            
+                            // Test the application health on Blue server
+                            sh """
+                                ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
+                                    curl -f http://localhost:8080/actuator/health || \
+                                    curl -f http://localhost:8080 || \
+                                    exit 1
+                                '
+                            """
+                            
+                            echo "✅ Health check passed! New deployment is healthy."
+                            healthCheckPassed = true
+                            break
+                            
+                        } catch (Exception e) {
+                            echo "⚠️ Health check attempt ${i} failed, waiting ${env.HEALTH_CHECK_RETRY_DELAY} seconds..."
+                            if (i < retries) {
+                                sleep env.HEALTH_CHECK_RETRY_DELAY.toInteger()
+                            }
+                        }
+                    }
+                    
+                    if (!healthCheckPassed) {
+                        echo "❌ All health check attempts failed. Application is not healthy."
+                        currentBuild.result = 'UNSTABLE'
+                        env.HEALTH_CHECK_FAILED = 'true'
+                    } else {
+                        env.HEALTH_CHECK_FAILED = 'false'
+                    }
+                }
+            }
+        }
+        
+        // STAGE 5: Conditional Rollback
+        stage('Rollback') {
+            when {
+                expression { env.HEALTH_CHECK_FAILED == 'true' }
+            }
+            environment {
+                GHCR_TOKEN = credentials("${GHCR_CREDENTIALS_ID}")
+            }
+            steps {
+                script {
+                    echo "🚨 HEALTH CHECK FAILED - Initiating rollback to previous version"
+                    
+                    sshagent([SSH_CREDENTIALS_ID]) {
+                        sh """
+                            # Rollback on Blue server
+                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
+                                echo "Stopping current deployment..."
+                                docker stop petclinic || true
+                                docker rm petclinic || true
+                                
+                                echo "Attempting to rollback to previous version: ${PREVIOUS_DOCKER_TAG}"
+                                # Try to use the previous tag, if not available use latest as fallback
+                                if docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${PREVIOUS_DOCKER_TAG}; then
+                                    echo "Rolling back to tag: ${PREVIOUS_DOCKER_TAG}"
+                                    docker run -d \\
+                                        --name petclinic \\
+                                        -p 8080:8080 \\
+                                        ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:${PREVIOUS_DOCKER_TAG}
+                                    echo "✅ Rollback to previous version completed!"
+                                else
+                                    echo "Previous tag not found, falling back to latest"
+                                    docker pull ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                                    docker run -d \\
+                                        --name petclinic \\
+                                        -p 8080:8080 \\
+                                        ${DOCKER_REGISTRY}/${GITHUB_USERNAME}/${GITHUB_REPO}:latest
+                                    echo "✅ Rollback to latest version completed!"
+                                fi
+                                
+                                sleep 30
+                                echo "Rollback container status:"
+                                docker ps
+                                echo "Verifying rollback health check..."
+                                curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8080 || echo "⚠️ Rollback health check also failed"
+                            '
+                        """
+                    }
+                }
+            }
+            post {
+                success {
+                    echo "🔄 Rollback procedure completed successfully"
+                    // Send rollback notification
+                    // emailext body: "Rollback was triggered for build ${BUILD_NUMBER} due to health check failure", subject: "Rollback Alert", to: "team@example.com"
+                }
+                failure {
+                    echo "❌ Rollback procedure failed"
+                }
+            }
+        }
     }
     
     post {
         always {
-            echo "Cleaning up local deployment..."
-            sh 'docker-compose down || true'
+            echo "Pipeline execution completed - Build ${currentBuild.result}"
+            // Cleanup tasks can go here
+        }
+        success {
+            echo "✅ Pipeline executed successfully!"
+            script {
+                if (env.HEALTH_CHECK_FAILED == 'true') {
+                    echo "⚠️ Pipeline succeeded with rollback (health check failed but rollback was successful)"
+                } else {
+                    echo "🎉 Pipeline succeeded - new deployment is healthy!"
+                }
+            }
+        }
+        unstable {
+            echo "⚠️ Pipeline marked as unstable - health check failed"
+            // emailext body: "Build ${BUILD_NUMBER} failed health check and was rolled back", subject: "Health Check Failure & Rollback", to: "team@example.com"
+        }
+        failure {
+            echo "❌ Pipeline failed!"
+            // emailext body: "Build ${BUILD_NUMBER} failed during deployment", subject: "Deployment Failure", to: "team@example.com"
         }
     }
 }
