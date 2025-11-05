@@ -165,49 +165,51 @@ pipeline {
         }
         
         // STAGE 4: Health Check
-        stage('Health Check') {
-            steps {
-                script {
-                    echo "Performing health check on Blue deployment..."
+       stage('Health Check') {
+    steps {
+        script {
+            echo "Performing health check on Blue deployment..."
+            
+            def healthCheckPassed = false
+            def retries = env.HEALTH_CHECK_MAX_RETRIES.toInteger()
+            
+            for (int i = 1; i <= retries; i++) {
+                try {
+                    echo "Health check attempt ${i}/${retries} on Blue server: ${BLUE_SERVER_IP}"
                     
-                    def healthCheckPassed = false
-                    def retries = env.HEALTH_CHECK_MAX_RETRIES.toInteger()
-                    
-                    for (int i = 1; i <= retries; i++) {
-                        try {
-                            echo "Health check attempt ${i}/${retries} on Blue server: ${BLUE_SERVER_IP}"
-                            
-                            // Test the application health on Blue server
-                            sh """
-                                ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
-                                    curl -f http://localhost:8080/actuator/health || \
-                                    curl -f http://localhost:8080 || \
-                                    exit 1
-                                '
-                            """
-                            
-                            echo "✅ Health check passed! New deployment is healthy."
-                            healthCheckPassed = true
-                            break
-                            
-                        } catch (Exception e) {
-                            echo "⚠️ Health check attempt ${i} failed, waiting ${env.HEALTH_CHECK_RETRY_DELAY} seconds..."
-                            if (i < retries) {
-                                sleep env.HEALTH_CHECK_RETRY_DELAY.toInteger()
-                            }
-                        }
+                    // Use SSH agent to connect to Blue server
+                    sshagent([SSH_CREDENTIALS_ID]) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${BLUE_SERVER_IP} '
+                                curl -f http://localhost:8080/actuator/health || \\
+                                curl -f http://localhost:8080 || \\
+                                exit 1
+                            '
+                        """
                     }
                     
-                    if (!healthCheckPassed) {
-                        echo "❌ All health check attempts failed. Application is not healthy."
-                        currentBuild.result = 'UNSTABLE'
-                        env.HEALTH_CHECK_FAILED = 'true'
-                    } else {
-                        env.HEALTH_CHECK_FAILED = 'false'
+                    echo "✅ Health check passed! New deployment is healthy."
+                    healthCheckPassed = true
+                    break
+                    
+                } catch (Exception e) {
+                    echo "⚠️ Health check attempt ${i} failed, waiting ${env.HEALTH_CHECK_RETRY_DELAY} seconds..."
+                    if (i < retries) {
+                        sleep env.HEALTH_CHECK_RETRY_DELAY.toInteger()
                     }
                 }
             }
+            
+            if (!healthCheckPassed) {
+                echo "❌ All health check attempts failed. Application is not healthy."
+                currentBuild.result = 'UNSTABLE'
+                env.HEALTH_CHECK_FAILED = 'true'
+            } else {
+                env.HEALTH_CHECK_FAILED = 'false'
+            }
         }
+    }
+}
         
         // STAGE 5: Conditional Rollback
         stage('Rollback') {
