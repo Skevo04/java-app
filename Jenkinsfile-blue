@@ -28,8 +28,7 @@ pipeline {
     
     stages {
         // STAGE 1: Build
-        stage('Build') {
-            parallel {
+        
                 stage('Frontend build') {
                     steps {
                         sh '''
@@ -65,8 +64,8 @@ pipeline {
                         }
                     }
                 }
-            }
-        }
+            
+        
         
         stage('Docker Build') {
             steps {
