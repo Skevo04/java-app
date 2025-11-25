@@ -173,8 +173,8 @@ pipeline {
                             sshagent([SSH_CREDENTIALS_ID]) {
                         sh """
                             ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${STAGING_SERVER_IP} '
-                                curl -f http://localhost:888/actuator/health || \\
-                                curl -f http://localhost:888 || \\
+                                curl -f http://localhost:8080/actuator/health || \\
+                                curl -f http://localhost:8080 || \\
                                 exit 1
                             '
                         """
