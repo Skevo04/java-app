@@ -170,11 +170,15 @@ pipeline {
                             echo "Health check attempt ${i}/${retries}"
                             
                             // Test the application health
-                            sh """
-                                curl -f https://192.168.64.10:8080/actuator/health || \
-                                curl -f https://192.168.64.10:8080 || \
+                            sshagent([SSH_CREDENTIALS_ID]) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ${SERVER_USER}@${STAGING_SERVER_IP} '
+                                curl -f http://localhost:888/actuator/health || \\
+                                curl -f http://localhost:888 || \\
                                 exit 1
-                            """
+                            '
+                        """
+                    }
                             
                             echo "✅ Health check passed!"
                             healthCheckPassed = true
