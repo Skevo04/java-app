@@ -171,8 +171,8 @@ pipeline {
                             
                             // Test the application health
                             sh """
-                                curl -f http://localhost:8080/actuator/health || \
-                                curl -f http://localhost:8080 || \
+                                curl -f http://192.168.64.10:8080/actuator/health || \
+                                curl -f http://192.168.64.10:8080 || \
                                 exit 1
                             """
                             
